@@ -2,6 +2,7 @@
 !/sun_miss0_recov/
 !/sun_miss1_recov/
 !/.gitignore
+!/README.md
 
 **/__pycache__/
 *.pyc

@@ -30,3 +30,11 @@ sun_miss1_recov/verify_out/*
 
 .env
 .env.*
+sun_miss1_recov/ae/debug.ipynb
+sun_miss1_recov/ae/check_background_patches.py
+sun_miss1_recov/ae/generate_eval_aligned_ratio_pool.py
+sun_miss1_recov/ae/patch_dataset.py
+sun_miss1_recov/ae/visualize_patch_grid.py
+**/patch_cache/
+sun_miss1_recov/vae/debug.ipynb
+sun_miss1_recov/vae/debug copy.ipynb

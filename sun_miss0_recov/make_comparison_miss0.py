@@ -31,7 +31,7 @@ if os.path.exists(NANUM_PATH):
 plt.rcParams["axes.unicode_minus"] = False
 
 ROOT_DIR = os.path.dirname(os.path.abspath(__file__))
-OUT_PATH = os.path.join(ROOT_DIR, "verify_out", "comparison_miss0_seed7.png")
+OUT_PATH = os.path.join(ROOT_DIR, "verify_out", "comparison_miss0_seed0.png")
 os.makedirs(os.path.dirname(OUT_PATH), exist_ok=True)
 
 LAMA_REPO_PATH = "/path/to/lama"
@@ -113,7 +113,7 @@ def main():
     LAMA_CKPT = os.path.join(ROOT_DIR, "lama", "runs", "ckpt_ep160.pt")  # 실제 최신 파일명 확인 후 조정
     PALETTE_CKPT = os.path.join(ROOT_DIR, "palette", "runs", "ckpt_ep50.pt")  # 실제 최신 파일명 확인 후 조정
 
-    seed = 7
+    seed = 0
     val_df = pd.read_csv(VAL_CSV).sample(n=200, random_state=seed).reset_index(drop=True)
     row = val_df.iloc[0]
     img = np.load(row["cache_path"])

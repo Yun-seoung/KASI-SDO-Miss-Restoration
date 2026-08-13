@@ -176,3 +176,32 @@ def masked_ssim(orig, restored, mask2d, margin=60, eps=1e-8):
     window = _gaussian_window(11, 1.5)
     ssim_map = _ssim_map(crop_orig_n, crop_restored_n, window, data_range=1.0)
     return float(ssim_map.mean())
+
+
+def restore_vertical_linear(damaged, mask2d):
+    """열(column) 단위 1D 선형 보간. 두 경계값을 직선으로만 잇기 때문에
+    구간이 아무리 넓어도 보간값이 두 경계값 사이 범위를 벗어날 수 없음
+    (구조적으로 overshoot 불가능).
+
+    damaged: (H, W) 손상된 이미지 배열
+    mask2d : (H, W) {0,1}, 1=손상(복원 대상)
+    반환   : (H, W) 복원된 배열 (float32)
+    """
+    restored = damaged.copy().astype(np.float32)
+    h, w = damaged.shape
+    rows = np.arange(h)
+
+    for c in range(w):
+        col_mask = mask2d[:, c]
+        if not col_mask.any():
+            continue
+        known_rows = rows[~col_mask]
+        if len(known_rows) < 2:
+            if len(known_rows) == 1:
+                restored[col_mask, c] = damaged[known_rows[0], c]
+            continue
+        known_vals = damaged[known_rows, c]
+        missing_rows = rows[col_mask]
+        restored[missing_rows, c] = np.interp(missing_rows, known_rows, known_vals)
+
+    return restored

@@ -8,6 +8,8 @@ make_comparison_miss0.py — MISS0 baseline/AE/VAE/LaMa/Palette 비교를 하나
        구버전 인터페이스(가중평균 고정) — AE/VAE/LaMa와 달리 merge_mode를 넘기지
        않고 호출. MISS0는 손상 크기가 작아 core_crop 없이도 문제없다고 판단해
        이 구조를 그대로 유지.
+[갱신] baseline을 cubic 대신 linear로 교체. run_baseline.py --method linear 정량
+       평가와 동일 기준으로 맞춤 (cubic overshoot 위험 회피).
 
 """
 
@@ -31,7 +33,7 @@ if os.path.exists(NANUM_PATH):
 plt.rcParams["axes.unicode_minus"] = False
 
 ROOT_DIR = os.path.dirname(os.path.abspath(__file__))
-OUT_PATH = os.path.join(ROOT_DIR, "verify_out", "comparison_miss0_seed0.png")
+OUT_PATH = os.path.join(ROOT_DIR, "verify_out", "comparison_miss0_seed6.png")
 os.makedirs(os.path.dirname(OUT_PATH), exist_ok=True)
 
 LAMA_REPO_PATH = "/path/to/lama"
@@ -95,7 +97,7 @@ def main():
     sys.path.insert(0, os.path.join(ROOT_DIR, "mask_bank"))
     from mask_loader import MaskBank
     from patch_geometry import get_damage_components
-    from restore_cubic import restore_vertical_cubic, apply_damage, masked_l1, masked_psnr
+    from restore_cubic import restore_vertical_linear, apply_damage, masked_l1, masked_psnr
 
     ae_eval = load_module("ae_eval_miss0", os.path.join(ROOT_DIR, "ae", "evaluate_ae.py"),
                            extra_syspath=os.path.join(ROOT_DIR, "ae"))
@@ -113,7 +115,7 @@ def main():
     LAMA_CKPT = os.path.join(ROOT_DIR, "lama", "runs", "ckpt_ep160.pt")  # 실제 최신 파일명 확인 후 조정
     PALETTE_CKPT = os.path.join(ROOT_DIR, "palette", "runs", "ckpt_ep50.pt")  # 실제 최신 파일명 확인 후 조정
 
-    seed = 0
+    seed = 6
     val_df = pd.read_csv(VAL_CSV).sample(n=200, random_state=seed).reset_index(drop=True)
     row = val_df.iloc[0]
     img = np.load(row["cache_path"])
@@ -123,7 +125,7 @@ def main():
     mask2d = mask_bank.sample()
     damaged = apply_damage(img, mask2d, fill_value=0.0)
 
-    restored_baseline = restore_vertical_cubic(damaged, mask2d)
+    restored_baseline = restore_vertical_linear(damaged, mask2d)
 
     model_ae = ae_eval.AE(base_ch=32).to(device)
     ckpt = torch.load(AE_CKPT, map_location=device)

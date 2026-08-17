@@ -18,6 +18,25 @@ LaMa는 PSNR/L1 지표상으로는 AE/VAE보다 낮았지만, Fourier Convolutio
 Palette(diffusion)도 마찬가지로 sample_steps를 20에서 200으로 늘렸을 때 픽셀
 지표(L1/PSNR)는 큰 변화가 없었지만 SSIM과 시각적 품질(노이즈 speckle 해소)은
 뚜렷하게 개선되어, 픽셀 지표와 지각 품질이 별개 축임을 다시 한번 확인했습니다.
+손상 규모가 작은 MISS0에서는 Palette가 SSIM 기준 근소 우위(0.9781)를 보였지만,
+손상 규모가 큰 MISS1에서는 AE/VAE 대비 뚜렷하게 열세로 나타나, 손상 크기가
+커질수록 diffusion 기반 방법의 픽셀 정확도가 상대적으로 저하됨을 확인했습니다.
+
+## 결과 — MISS0 (협소 손상, 판정 기준: missvals > 0, 평균 손상 비율 0.28%)
+
+| 모델 | masked_l1 | masked_rmse | masked_psnr(dB) | masked_ssim |
+|---|---|---|---|---|
+| Baseline (linear) | 2.5458 | 3.6055 | 51.38 | 0.9679 |
+| AE | 2.5936 | 4.2750 | 51.08 | 0.9730 |
+| VAE | 2.4369 | 3.8399 | 51.54 | 0.9732 |
+| LaMa | 3.5533 | 8.7472 | 47.59 | 0.9683 |
+| Palette | 2.4940 | 3.8690 | 51.36 | 0.9781 |
+
+*(MISS0 기준, L1·PSNR은 VAE가 최우수. SSIM만 보면 Palette(0.9781)가 근소 우위)*
+
+![comparison_miss0](sun_miss0_recov/verify_out/comparison_miss0/comparison_miss0_case1.png)
+
+## 결과 — MISS1 (중간 규모 손상, 판정 기준: missvals > 1%, 평균 손상 비율 2.66%)
 
 | 모델 | masked_l1 | masked_rmse | masked_psnr(dB) | masked_ssim |
 |---|---|---|---|---|
@@ -27,15 +46,12 @@ Palette(diffusion)도 마찬가지로 sample_steps를 20에서 200으로 늘렸�
 | LaMa | 5.73 | 9.49 | 44.69 | 0.8424 |
 | Palette | 9.70 | 17.43 | 39.98 | 0.7469 |
 
-*(MISS1 기준, 픽셀 지표는 AE/VAE가 우세하나 시각 품질은 LaMa와 Palette(sample_steps=200)가
+*(MISS1 기준, 픽셀 지표는 AE/VAE가 우세하나 시각 품질은 LaMa와 Palette가
 더 자연스러움)*
 
-\* Palette는 diffusion sample_steps=200, core_crop 병합, 200장 평가 기준입니다
-(fallback_px=10,204,292로 AE/VAE/LaMa와 동일 조건 확보).
+\* Palette는 diffusion sample_steps=200, core_crop 병합, 200장 평가 기준입니다.
 
-## 복원 결과 비교
-
-![comparison](sun_miss1_recov/verify_out/comparison_miss1/comparison_miss1_case1.png)
+![comparison_miss1](sun_miss1_recov/verify_out/comparison_miss1/comparison_miss1_case1.png)
 
 ## 사용 모델
 

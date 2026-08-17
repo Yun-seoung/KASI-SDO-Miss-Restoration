@@ -15,6 +15,9 @@ MISS1(중간 규모) 등으로 단계를 구분하고, 각 단계별로 복원 �
 픽셀 단위 지표(PSNR, L1)와 실제 시각적 품질이 항상 일치하지 않았습니다.
 LaMa는 PSNR/L1 지표상으로는 AE/VAE보다 낮았지만, Fourier Convolution 기반의
 넓은 receptive field 덕분에 실제 시각적으로는 더 자연스러운 복원 결과를 보였습니다.
+Palette(diffusion)도 마찬가지로 sample_steps를 20에서 200으로 늘렸을 때 픽셀
+지표(L1/PSNR)는 큰 변화가 없었지만 SSIM과 시각적 품질(노이즈 speckle 해소)은
+뚜렷하게 개선되어, 픽셀 지표와 지각 품질이 별개 축임을 다시 한번 확인했습니다.
 
 | 모델 | masked_l1 | masked_rmse | masked_psnr(dB) | masked_ssim |
 |---|---|---|---|---|
@@ -22,13 +25,13 @@ LaMa는 PSNR/L1 지표상으로는 AE/VAE보다 낮았지만, Fourier Convolutio
 | AE | 3.82 | 7.13 | 47.32 | 0.8747 |
 | VAE | 3.90 | 7.16 | 47.36 | 0.8757 |
 | LaMa | 5.73 | 9.49 | 44.69 | 0.8424 |
-| Palette* | 9.74 | 14.40 | 40.58 | 0.7084 |
+| Palette | 9.70 | 17.43 | 39.98 | 0.7469 |
 
-*(MISS1 기준, 픽셀 지표는 AE/VAE가 우세하나 시각 품질은 LaMa가 더 자연스러움)*
+*(MISS1 기준, 픽셀 지표는 AE/VAE가 우세하나 시각 품질은 LaMa와 Palette(sample_steps=200)가
+더 자연스러움)*
 
-\* Palette는 diffusion sample_steps=20 기준 잠정 결과입니다. 압축된 스텝 수로 인한
-베타 스케줄 불일치로 시각적 노이즈(speckle)가 발생함을 확인했으며, sample_steps=200
-기준 재평가 후 갱신 예정입니다.
+\* Palette는 diffusion sample_steps=200, core_crop 병합, 200장 평가 기준입니다
+(fallback_px=10,204,292로 AE/VAE/LaMa와 동일 조건 확보).
 
 ## 복원 결과 비교
 

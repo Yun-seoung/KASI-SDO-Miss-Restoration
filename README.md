@@ -1,66 +1,119 @@
-# KASI SDO MISS 영상 복원 (AE / VAE / LaMa / Palette)
+# KASI SDO MISS 영상 복원 — AI 기반 손상 진단 및 복원
 
 한국천문연구원(KASI) 우주탐사기술센터 하계 인턴십에서 진행한 프로젝트입니다.
-SDO/AIA 131Å 태양 관측 영상에 발생하는 데이터 손실(MISS) 영역을 딥러닝으로 복원하고,
-4가지 방법론(AE, VAE, LaMa, Palette Diffusion)의 성능을 비교 평가했습니다.
+SDO/AIA 131Å 태양 관측 영상에 발생하는 데이터 손실(MISS) 영역을 진단하고,
+5가지 방법론(Baseline, AE, VAE, LaMa, Palette)의 복원 성능을 비교 평가했습니다.
 
-## 배경
+- **기간**: 2026년 여름 (약 2개월)
+- **지도**: 백지혜 박사님, 조원근 박사님
+- **소속**: 충남대학교 컴퓨터융합학부 3학년 최윤성
 
-SDO(Solar Dynamics Observatory) AIA 131Å 채널 영상은 readout channel 오류 등으로
-가로 밴드 형태의 데이터 손실(MISS)이 발생합니다. 손상 규모에 따라 MISS0(협소 손상),
-MISS1(중간 규모) 등으로 단계를 구분하고, 각 단계별로 복원 성능을 검증했습니다.
+## 1. 배경
 
-## 핵심 발견
+SDO는 16년간 태양을 관측해온 핵심 자산 데이터입니다.
+131Å 채널을 전수 조사한 결과, 4,200만 프레임 중 약 70만 건에서 이상 신호가 발견됐으나
+이 중 93.6%는 지구 식(Eclipse) 등 정상 운영 상태였고,
+**실제 손상은 3개 유형 합계 44,453건**이었습니다.
 
-픽셀 단위 지표(PSNR, L1)와 실제 시각적 품질이 항상 일치하지 않았습니다.
-LaMa는 PSNR/L1 지표상으로는 AE/VAE보다 낮았지만, Fourier Convolution 기반의
-넓은 receptive field 덕분에 실제 시각적으로는 더 자연스러운 복원 결과를 보였습니다.
-Palette(diffusion)도 마찬가지로 sample_steps를 20에서 200으로 늘렸을 때 픽셀
-지표(L1/PSNR)는 큰 변화가 없었지만 SSIM과 시각적 품질(노이즈 speckle 해소)은
-뚜렷하게 개선되어, 픽셀 지표와 지각 품질이 별개 축임을 다시 한번 확인했습니다.
-손상 규모가 작은 MISS0에서는 Palette가 SSIM 기준 근소 우위(0.9781)를 보였지만,
-손상 규모가 큰 MISS1에서는 AE/VAE 대비 뚜렷하게 열세로 나타나, 손상 크기가
-커질수록 diffusion 기반 방법의 픽셀 정확도가 상대적으로 저하됨을 확인했습니다.
+## 2. 손상 유형 분류
 
-## 결과 — MISS0 (협소 손상, 판정 기준: missvals > 0, 평균 손상 비율 0.28%)
+QUALITY 헤더의 32비트 플래그를 기반으로 세 가지 손상 유형을 분류했습니다.
 
-| 모델 | masked_l1 | masked_rmse | masked_psnr(dB) | masked_ssim |
+| 유형 | 토큰 | 건수 | 판별 방법 | 판별 정확도 |
 |---|---|---|---|---|
-| Baseline (linear) | 2.5458 | 3.6055 | 51.38 | 0.9679 |
-| AE | 2.5936 | 4.2750 | 51.08 | 0.9730 |
-| VAE | 2.4369 | 3.8399 | 51.54 | 0.9732 |
-| LaMa | 3.5533 | 8.7472 | 47.59 | 0.9683 |
-| Palette | 2.4940 | 3.8690 | 51.36 | 0.9781 |
+| 픽셀(행) 손실 | Q_1_MISS0~3 | 19,002 | 결손 픽셀(NaN) 존재 유무 | 100% |
+| 밝기 이상 | Q_AIA_FOOR | 13,862 | 노출시간(exptime) > 4.0초 | 100% |
+| 카메라 상태 이상 | Q_CAM_ANOM1 | 11,909 | AIHIS192 2단계 판정 | 재현율 99.99% |
 
-*(MISS0 기준, L1·PSNR은 VAE가 최우수. SSIM만 보면 Palette(0.9781)가 근소 우위)*
+밝기 이상형과 카메라 상태 이상형은 **메타데이터만으로 자동 판별 가능**했으며,
+실제 이미지 복원이 필요한 유형은 **픽셀 손실형(MISS)** 뿐이었습니다.
 
-![comparison_miss0](sun_miss0_recov/verify_out/comparison_miss0/comparison_miss0_case1.png)
+## 3. 복원 파이프라인
 
-## 결과 — MISS1 (중간 규모 손상, 판정 기준: missvals > 1%, 평균 손상 비율 2.66%)
+고전적 방법(Baseline)부터 딥러닝(AE, VAE, LaMa, Palette)까지
+동일 조건에서 정량 비교했습니다.
 
-| 모델 | masked_l1 | masked_rmse | masked_psnr(dB) | masked_ssim |
+    원본 로드 → 손상 시뮬레이션 → 패치 복원 → core-crop 병합 → 정량·정성 평가
+
+### Baseline: Cubic → Linear 전환
+
+넓은 손상 밴드(최대 수백~수천 px)에서 cubic spline은 값이 크게 흔들리는(overshoot)
+문제가 있어, linear 보간으로 전환했습니다 (L1 기준 약 34배 개선).
+
+### AE/VAE 구조 개선: Deep Encoder + Core-Crop
+
+수용영역(RF ≈ 68px)이 MISS1 손상 폭(289~409px)보다 좁아 손상 영역이
+단색으로 붕괴(collapse)하는 문제를 진단했습니다. 인코더를 4단계로 확장하고
+dilated bottleneck을 추가해 RF를 넓혔으며, 겹치는 타일을 평균 내는 대신
+각 타일의 중앙 core만 잘라 이어붙이는 core-crop 병합 방식을 도입해
+경계 얼룩(banding artifact)을 제거했습니다.
+
+### 사용 모델
+
+- **Baseline**: 열(column) 단위 1D 선형 보간
+- **AE**: 4-level encoder + dilated bottleneck convolution 기반 오토인코더
+- **VAE**: AE와 동일 구조에 확률적 잠재변수(KL divergence) 추가
+- **LaMa**: Fast Fourier Convolution 기반 GAN, 넓은 receptive field로 대형 손상에 강점
+- **Palette**: Conditional Diffusion Model 기반 inpainting (DDPM 계열, sample_steps=200)
+
+## 4. 정량 결과
+
+손상 영역(masked region)만을 대상으로 200장 평균을 산출했습니다.
+
+### MISS0 (협소 손상, missvals > 0, 평균 손상 비율 0.28%)
+
+| 모델 | Masked L1↓ | Masked RMSE↓ | Masked PSNR(dB)↑ | Masked SSIM↑ |
+|---|---|---|---|---|
+| Baseline (linear) | 2.55 | 3.61 | 51.38 | 0.9679 |
+| AE | 2.59 | 4.28 | 51.08 | 0.9730 |
+| VAE | 2.44 | 3.84 | 51.54 | 0.9732 |
+| LaMa | 3.55 | 8.75 | 47.59 | 0.9683 |
+| **Palette** | **2.49** | **3.87** | **51.36** | **0.9781** |
+
+*L1·PSNR은 VAE가 최우수, SSIM은 Palette(0.9781)가 근소 우위*
+
+### MISS1 (중간 규모 손상, missvals > 1%, 평균 손상 비율 2.66%)
+
+| 모델 | Masked L1↓ | Masked RMSE↓ | Masked PSNR(dB)↑ | Masked SSIM↑ |
 |---|---|---|---|---|
 | Baseline (linear) | 3.91 | 6.80 | 47.08 | 0.8527 |
 | AE | 3.82 | 7.13 | 47.32 | 0.8747 |
-| VAE | 3.90 | 7.16 | 47.36 | 0.8757 |
+| **VAE** | **3.90** | **7.16** | **47.36** | **0.8757** |
 | LaMa | 5.73 | 9.49 | 44.69 | 0.8424 |
 | Palette | 9.70 | 17.43 | 39.98 | 0.7469 |
 
-*(MISS1 기준, 픽셀 지표는 AE/VAE가 우세하나 시각 품질은 LaMa와 Palette가
-더 자연스러움)*
+*픽셀 지표는 VAE가 최우수, 시각 품질은 LaMa와 Palette가 더 자연스러움*
 
-\* Palette는 diffusion sample_steps=200, core_crop 병합, 200장 평가 기준입니다.
+\* Palette(MISS1)는 sample_steps=200, core_crop 병합, 200장 평가 기준
+(fallback_px=10,204,292로 AE/VAE/LaMa와 동일 조건 확보)
+
+## 5. 핵심 발견 — 정량 순위 ≠ 정성 순위
+
+같은 5개 모델, 같은 데이터인데 **정량 순위와 정성 순위가 다르게 나타났습니다.**
+
+| 모델 | 정량 순위 (PSNR) | 정성 순위 (시각 품질) | 특징 |
+|---|---|---|---|
+| VAE | 1위 | 2~3위 | 매끈하지만 디테일이 사라져 흐릿하게 뭉개짐 |
+| AE | 2위 | 2~3위 | VAE와 유사한 경향 |
+| Baseline | 3위 | 4위 | 세로줄 형태의 노이즈가 뚜렷하게 남음 |
+| LaMa | 4위 | **1위** | 디테일한 텍스처가 유일하게 살아있고 가장 사실적 |
+| Palette | 5위 | 2~3위 | 타일 경계 이질감이 있지만 디테일이 살아있음 |
+
+**결론**: 정량 지표(L1·PSNR)만 보고 최종 모델을 고르면, 실제로 가장 자연스러운
+결과(LaMa)를 놓치게 됨. 정량 평가는 참고 지표로 삼되, 최종 판단은 반드시
+정성 평가를 함께 거쳐야 함.
+
+## 6. 복원 결과 비교
+
+### MISS0
+
+![comparison_miss0](sun_miss0_recov/verify_out/comparison_miss0/comparison_miss0_case1.png)
+
+### MISS1
 
 ![comparison_miss1](sun_miss1_recov/verify_out/comparison_miss1/comparison_miss1_case1.png)
 
-## 사용 모델
-
-- **AE**: 4-level encoder + dilated bottleneck convolution 기반 오토인코더
-- **VAE**: AE와 동일 구조에 확률적 잠재변수 추가
-- **LaMa**: Fast Fourier Convolution 기반 GAN, 넓은 receptive field로 대형 손상에 강점
-- **Palette**: Conditional Diffusion Model 기반 inpainting (DDPM 계열)
-
-## 저장소 구조
+## 7. 저장소 구조
 
     sun_miss0_recov/          # 협소 손상(MISS0) 파이프라인
     sun_miss1_recov/          # 중간 규모 손상(MISS1) 파이프라인
@@ -72,7 +125,7 @@ Palette(diffusion)도 마찬가지로 sample_steps를 20에서 200으로 늘렸�
 
 ## 기술 스택
 
-Python, PyTorch, NumPy, Pandas, scipy.ndimage, matplotlib, astropy (FITS 처리)
+Python, PyTorch, NumPy, Pandas, scipy, matplotlib, astropy (FITS 처리)
 
 ## 참고
 
